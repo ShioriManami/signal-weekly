@@ -1,4 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap");
+/* Las tipografías se piden con <link rel="stylesheet"> en client/index.html:
+   dentro de este archivo el @import quedaba escondido detrás del CSS del
+   bundle y el navegador no lo descubría hasta ~750 ms. */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -167,6 +169,20 @@ input:focus-visible {
   .hero-orb-two {
     animation: drift-two 13s ease-in-out infinite alternate;
   }
+  /* Flotación de la tarjeta del hero. Anima `translate` (propiedad
+     independiente) y no `transform`, para no pisar el `scale` que motion
+     escribe en la entrada: el resultado compuesto es el mismo. */
+  .hero-float {
+    animation: hero-float 6s ease-in-out 0.2s infinite;
+  }
+  /* Home.tsx pone `.hero-anim-paused` en la sección del hero cuando sale del
+     viewport o cuando la pestaña se oculta. Pausado no consume main thread ni
+     rAF, y al reanudar retoma en el mismo punto. */
+  .hero-anim-paused .hero-orb-one,
+  .hero-anim-paused .hero-orb-two,
+  .hero-anim-paused .hero-float {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes drift-one {
@@ -177,6 +193,15 @@ input:focus-visible {
 @keyframes drift-two {
   to {
     transform: translate(-26px, -19px) scale(0.94);
+  }
+}
+@keyframes hero-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
   }
 }
 

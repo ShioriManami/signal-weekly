@@ -1,10 +1,9 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { MotionConfig } from "motion/react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ToasterGate } from "./lib/toast";
 import Home from "./pages/Home";
 
 function Router() {
@@ -24,15 +23,19 @@ function Router() {
 // Motion: `reducedMotion="user"` hace que toda animación de motion respete
 // la preferencia del sistema (los transforms se vuelven instantáneos).
 
+// Toasts: <ToasterGate/> no monta nada hasta el primer toast, así `sonner`
+// queda fuera del bundle inicial (ver `@/lib/toast`).
+// Sin <TooltipProvider>: no hay ningún <Tooltip> en la landing, así que Radix
+// tampoco entra al bundle. Si se agrega uno, envolver ahí mismo con el
+// provider de `@/components/ui/tooltip`.
+
 function App() {
   return (
     <ErrorBoundary>
       <MotionConfig reducedMotion="user">
         <ThemeProvider defaultTheme="light">
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <ToasterGate />
+          <Router />
         </ThemeProvider>
       </MotionConfig>
     </ErrorBoundary>

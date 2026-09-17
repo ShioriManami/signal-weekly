@@ -1,7 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
+  useInView,
   useMotionValueEvent,
   useScroll,
 } from "motion/react";
@@ -23,7 +24,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   EASE_OUT,
   Reveal,
@@ -176,6 +177,25 @@ function scrollToSubscribe() {
   document.querySelector("#subscribe")?.scrollIntoView({ behavior: "smooth" });
 }
 
+/**
+ * `true` mientras la pestaña está visible.
+ *
+ * Nada que solo se vea (animaciones, autoplay) debería seguir corriendo en
+ * segundo plano: en una pestaña oculta es trabajo que el usuario nunca ve.
+ */
+function usePageVisible() {
+  const [isVisible, setIsVisible] = useState(() => !document.hidden);
+
+  useEffect(() => {
+    const syncVisibility = () => setIsVisible(!document.hidden);
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
+
+  return isVisible;
+}
+
 function IssuePreview() {
   return (
     <div className="hero-card relative overflow-hidden rounded-[34px] bg-[#111a3b] p-2 shadow-[0_34px_80px_rgba(25,25,61,0.23)]">
@@ -259,6 +279,19 @@ export default function Home() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
+  const heroRef = useRef<HTMLElement>(null);
+  const voicesRef = useRef<HTMLElement>(null);
+  // IntersectionObserver, no scroll listener: no cuesta nada en reposo.
+  const isHeroInView = useInView(heroRef);
+  const isVoicesInView = useInView(voicesRef);
+  const isPageVisible = usePageVisible();
+
+  // Las animaciones infinitas del hero (los orbes y la flotación de la
+  // tarjeta) viven en CSS y se pausan con `animation-play-state`. Pausar en
+  // lugar de desmontar mantiene la posición exacta: al volver retoman donde
+  // estaban, sin salto.
+  const heroAnimationsPaused = !isHeroInView || !isPageVisible;
+
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", latest => {
     // setState con el mismo valor no re-renderiza: barato en cada scroll.
@@ -282,14 +315,17 @@ export default function Home() {
     setActiveTestimonial(index);
   };
 
+  // El autoplay solo existe mientras se puede ver: hover, pestaña oculta o
+  // sección fuera del viewport lo apagan. Al reanudar se crea un intervalo
+  // nuevo, así que arranca de cero y no avanza varios testimonios de golpe.
   useEffect(() => {
-    if (isCarouselPaused) return;
+    if (isCarouselPaused || !isVoicesInView || !isPageVisible) return;
     const timer = window.setInterval(
       showNextTestimonial,
       TESTIMONIAL_INTERVAL_MS
     );
     return () => window.clearInterval(timer);
-  }, [isCarouselPaused]);
+  }, [isCarouselPaused, isVoicesInView, isPageVisible]);
 
   const submitEmail = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -395,7 +431,12 @@ export default function Home() {
         </div>
       </div>
 
-      <section className="relative overflow-hidden px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24">
+      <section
+        ref={heroRef}
+        className={`relative overflow-hidden px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24 ${
+          heroAnimationsPaused ? "hero-anim-paused" : ""
+        }`}
+      >
         <div className="hero-orb hero-orb-one" />
         <div className="hero-orb hero-orb-two" />
         <div className="mx-auto max-w-[1240px]">
@@ -522,20 +563,15 @@ export default function Home() {
               </motion.div>
             </motion.div>
 
+            {/* La entrada (opacity + scale) la hace motion una sola vez. La
+                flotación infinita es CSS (`.hero-float`, keyframes sobre
+                `translate`, que no pisa el `transform` de motion): se pausa
+                sola cuando el hero sale de pantalla, sin gastar rAF. */}
             <motion.div
-              className="relative mx-auto min-w-0 w-full max-w-[560px] lg:ml-auto lg:mr-0"
+              className="hero-float relative mx-auto min-w-0 w-full max-w-[560px] lg:ml-auto lg:mr-0"
               initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1, y: [0, -8, 0] }}
-              transition={{
-                opacity: { duration: 0.7, delay: 0.2, ease: EASE_OUT },
-                scale: { duration: 0.7, delay: 0.2, ease: EASE_OUT },
-                y: {
-                  duration: 6,
-                  delay: 0.2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                },
-              }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.7, delay: 0.2, ease: EASE_OUT }}
             >
               <IssuePreview />
               <div className="absolute -bottom-7 -left-4 z-10 flex max-w-[255px] items-center gap-3 rounded-2xl border border-[#111a3b]/10 bg-[#fffdf8]/95 p-3 shadow-[0_15px_38px_rgba(22,25,60,0.14)] backdrop-blur-lg sm:-left-10">
@@ -720,6 +756,7 @@ export default function Home() {
 
       <section
         id="voices"
+        ref={voicesRef}
         className="scroll-mt-6 bg-[#fcf8ef] px-4 py-20 sm:px-6 lg:px-8 lg:py-28"
       >
         <div className="mx-auto max-w-[1240px]">

@@ -20,4 +20,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
+// Reexportado para que `@/lib/toast` traiga <Toaster/> y `toast` en el mismo
+// chunk perezoso: una sola carga de `sonner` con el primer toast.
+export { toast } from "sonner";
+
 export { Toaster };
